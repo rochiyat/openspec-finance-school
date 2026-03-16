@@ -24,3 +24,5 @@ logs/
 
 .opencode/*
 .vscode/*
+
+*.bat
