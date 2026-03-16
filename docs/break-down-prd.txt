@@ -1,0 +1,163 @@
+Saya anggap MVP = `Phase 1` pada PRD. Semua dashboard saya taruh setelah fondasi data/tagihan/pembayaran. `audit-log` saya tempatkan di polish karena ada di `Phase 2`, walau DoD menyebutnya aktif.
+
+**Must-Have**
+
+1. `auth-session-access`
+- goal: menyediakan fondasi autentikasi dan kontrol akses berbasis role untuk semua capability lain.
+- scope: `POST /auth/login`, `GET /auth/me`, password hashing, role guard dasar, validasi input, basic login UI, error handling, Swagger.
+- dependencies: none
+- acceptance criteria: login API tersedia; endpoint `me` tersedia; password di-hash; role based access aktif; validasi backend lengkap; UI dasar tersedia; error handling tersedia.
+- out of scope: reset password, MFA, SSO.
+
+2. `user-role-administration`
+- goal: memungkinkan superadmin mengelola user dan role operasional.
+- scope: create/update user internal, assign role `SUPERADMIN`/`FINANCE`/`GURU`/`PARENT`, basic user-role management UI.
+- dependencies: `auth-session-access`
+- acceptance criteria: superadmin dapat mengelola user dan role; role access sesuai; user dapat dipakai untuk akses capability sesuai PRD.
+- out of scope: permission matrix granular, self-registration publik.
+
+3. `academic-years-and-classes`
+- goal: menyediakan master data struktur akademik untuk referensi siswa dan dashboard guru.
+- scope: master `AcademicYear`, master `Class`, relasi `homeroom_teacher_id`, penandaan tahun ajaran aktif, basic UI.
+- dependencies: `auth-session-access`, `user-role-administration`
+- acceptance criteria: data `AcademicYear` menyimpan `name/start_date/end_date/is_active`; data `Class` menyimpan `name/homeroom_teacher_id/academic_year_id`; superadmin dapat mengelola master data; validasi backend lengkap.
+- out of scope: kenaikan kelas massal, rollover tahun ajaran.
+
+4. `student-directory`
+- goal: menyediakan data siswa yang menjadi pusat relasi tagihan dan pembayaran.
+- scope: `GET /students`, `POST /students`, `GET /students/:id`, `PATCH /students/:id`, basic student management UI.
+- dependencies: `academic-years-and-classes`
+- acceptance criteria: student menyimpan `nis/full_name/gender/class_id/academic_year_id/status_active`; endpoint students tersedia; semua list API berpaginasi; role access sesuai; validasi backend lengkap.
+- out of scope: import Excel, arsip alumni.
+
+5. `parent-directory`
+- goal: menyediakan data orang tua sebagai penerima notifikasi dan pemilik akses tagihan anak.
+- scope: `GET /parents`, `POST /parents`, `GET /parents/:id`, basic parent management UI.
+- dependencies: `auth-session-access`, `user-role-administration`
+- acceptance criteria: parent menyimpan `user_id/full_name/phone/email/address`; endpoint parents tersedia; semua list API berpaginasi; role access sesuai; validasi backend lengkap.
+- out of scope: preferensi notifikasi lanjutan, multi-contact per parent.
+
+6. `student-parent-mapping`
+- goal: menghubungkan siswa ke orang tua untuk akses data dan notifikasi personal.
+- scope: `POST /student-parent-maps`, `GET /students/:id/parents`, `GET /parents/:id/students`, penandaan `is_primary`.
+- dependencies: `student-directory`, `parent-directory`
+- acceptance criteria: satu parent dapat memiliki banyak siswa; satu siswa minimal memiliki satu parent utama; endpoint mapping tersedia; role access sesuai; validasi backend lengkap.
+- out of scope: aturan wali khusus/non-keluarga yang kompleks.
+
+7. `billing-type-catalog`
+- goal: menyediakan master jenis tagihan yang menjadi dasar pembuatan billing.
+- scope: master `BillingType`, pengelolaan kode utama, flag `is_installment_allowed`, `recurrence_type`, basic UI.
+- dependencies: `auth-session-access`
+- acceptance criteria: superadmin dapat mengelola jenis tagihan; tersedia tipe `UANG_MASUK`, `SPP`, `UANG_TAHUNAN`; field `code/name/is_installment_allowed/recurrence_type` tersedia; role access sesuai.
+- out of scope: recurring engine otomatis.
+
+8. `billing-record-management`
+- goal: memungkinkan staf keuangan membuat dan melihat tagihan per siswa.
+- scope: `GET /billings`, `POST /billings`, `POST /billings/bulk-create`, `GET /billings/:id`, basic billing management UI.
+- dependencies: `student-directory`, `billing-type-catalog`
+- acceptance criteria: finance dapat membuat tagihan; billing menyimpan `student_id/billing_type_id/title/total_amount/due_date/installment_allowed/status/created_by/created_at`; status mendukung `UNPAID/PARTIALLY_PAID/PAID/OVERDUE`; semua list API berpaginasi; role access sesuai.
+- out of scope: generate tagihan periodik otomatis, import massal spreadsheet.
+
+9. `installment-plan-management`
+- goal: memungkinkan tagihan tertentu dipecah menjadi cicilan yang dapat dilacak.
+- scope: `POST /installments/plans`, `GET /installments/plans/:id`, pembuatan `InstallmentPlan` dan `InstallmentItem`, basic installment management UI.
+- dependencies: `billing-record-management`
+- acceptance criteria: cicilan hanya boleh jika `billing_type` mengizinkan; plan menyimpan `total_installments/installment_amount/start_date`; item menyimpan `installment_no/due_date/amount/status`; status item mendukung `UNPAID/PAID/OVERDUE`; role access sesuai.
+- out of scope: reschedule cicilan, negosiasi ulang tenor.
+
+10. `payment-entry-and-settlement`
+- goal: mencatat pembayaran dan menyelesaikan status billing/cicilan secara benar.
+- scope: `GET /payments`, `POST /payments`, `GET /payments/:id`, basic payment entry UI, update status billing/installment.
+- dependencies: `billing-record-management`, `installment-plan-management`
+- acceptance criteria: `amount_paid <= remaining_amount`; jika total bayar = total tagihan maka `PAID`; jika sebagian maka `PARTIALLY_PAID`; payment dapat terhubung ke `billing_id` atau `installment_item_id`; semua cicilan lunas membuat billing lunas; semua list API berpaginasi.
+- out of scope: payment gateway, refund, rekonsiliasi bank.
+
+11. `parent-billing-visibility`
+- goal: memberi akses baca kepada orang tua untuk melihat kewajiban dan histori pembayaran anak.
+- scope: tampilan/tagihan khusus parent, histori pembayaran, filtering berdasarkan relasi parent-student.
+- dependencies: `student-parent-mapping`, `billing-record-management`, `payment-entry-and-settlement`, `auth-session-access`
+- acceptance criteria: orang tua dapat melihat tagihan anak; orang tua dapat melihat riwayat pembayaran; akses hanya untuk siswa yang terhubung; role access sesuai; UI dasar tersedia.
+- out of scope: pembayaran mandiri online, download kuitansi.
+
+12. `notification-template-management`
+- goal: menyediakan template notifikasi yang bisa dipakai ulang oleh workflow event-driven.
+- scope: master `NotificationTemplate`, basic UI, variable registry per channel.
+- dependencies: `auth-session-access`
+- acceptance criteria: superadmin dapat mengelola template notifikasi; template menyimpan `code/name/channel/subject/content/variables`; variabel template mendukung placeholder PRD seperti `{{parent_name}}`, `{{student_name}}`, `{{billing_title}}`, `{{amount_paid}}`, `{{remaining_amount}}`, `{{due_date}}`.
+- out of scope: AI template generation, versioning template.
+
+13. `personal-notification-center`
+- goal: memungkinkan pembuatan, pengiriman, dan pelacakan notifikasi personal.
+- scope: `GET /notifications`, `POST /notifications/personal`, `POST /notifications/:id/send`, `Notification Center`, adapter email Gmail SMTP, adapter WhatsApp Fonnte.
+- dependencies: `parent-directory`, `student-parent-mapping`, `notification-template-management`
+- acceptance criteria: notification menyimpan `type/scope/title/message/recipient_user_id/recipient_parent_id/channel/status/scheduled_at/sent_at/source_event/metadata`; scope personal didukung; channel `EMAIL` dan `WHATSAPP` didukung; status notifikasi tercatat; semua list API berpaginasi.
+- out of scope: global notification, retry otomatis, scheduler reminder.
+
+14. `event-driven-personal-notification-triggers`
+- goal: mengotomasi notifikasi personal dari event bisnis utama dengan payload standar.
+- scope: publish/consume event domain untuk billing, payment, installment; render template; create notification dari event.
+- dependencies: `billing-record-management`, `installment-plan-management`, `payment-entry-and-settlement`, `personal-notification-center`
+- acceptance criteria: notifikasi berbasis event driven architecture; payload mengikuti standar `event_name/.../channels/context`; event personal minimal mencakup `billing.created`, `billing.updated`, `payment.created`, `payment.confirmed`, `installment.created`; notifikasi konfirmasi pembayaran dan pengingat personal bisa dihasilkan dari event.
+- out of scope: `due_soon/overdue` scheduler, global event.
+
+15. `teacher-payment-status-dashboard`
+- goal: memberi guru visibilitas status administrasi siswa di kelasnya tanpa hak ubah transaksi.
+- scope: `GET /dashboard/teacher`, daftar siswa kelas, status pembayaran, daftar siswa menunggak, basic dashboard UI.
+- dependencies: `academic-years-and-classes`, `student-directory`, `billing-record-management`, `payment-entry-and-settlement`
+- acceptance criteria: guru melihat daftar siswa di kelas; guru melihat status pembayaran; guru melihat siswa menunggak; guru tidak memiliki akses perubahan transaksi keuangan; dashboard load < 3 detik.
+- out of scope: edit billing/payment, analitik lintas kelas.
+
+16. `finance-operations-dashboard`
+- goal: memberi staf keuangan ringkasan operasional penerimaan dan piutang.
+- scope: `GET /dashboard/finance`, metrik tagihan/pembayaran/piutang/cicilan, basic dashboard UI.
+- dependencies: `billing-record-management`, `installment-plan-management`, `payment-entry-and-settlement`
+- acceptance criteria: dashboard finance menampilkan total tagihan, total pembayaran masuk, outstanding receivable, siswa menunggak, cicilan aktif; dashboard load < 3 detik.
+- out of scope: export laporan, forecasting.
+
+17. `superadmin-global-dashboard`
+- goal: memberi superadmin visibilitas global atas pembayaran dan notifikasi.
+- scope: `GET /dashboard/superadmin`, statistik pembayaran, statistik notifikasi, laporan global, basic dashboard UI.
+- dependencies: `finance-operations-dashboard`, `personal-notification-center`, `event-driven-personal-notification-triggers`
+- acceptance criteria: dashboard superadmin menampilkan statistik pembayaran, statistik notifikasi, laporan global; dashboard load < 3 detik.
+- out of scope: BI dashboard kustom, multi-tenant analytics.
+
+**Polish**
+
+18. `global-notification-broadcasts`
+- goal: memungkinkan superadmin mengirim notifikasi global ke banyak penerima.
+- scope: `POST /notifications/global`, scope global, pencatatan status kirim.
+- dependencies: `personal-notification-center`, `notification-template-management`
+- acceptance criteria: superadmin dapat mengirim notifikasi global; contoh use case mencakup pengumuman pembayaran tahunan dan perubahan biaya; status notifikasi tercatat.
+- out of scope: segmentasi audiens kompleks.
+
+19. `reminder-scheduler`
+- goal: mengotomasi reminder tagihan dan cicilan menjelang jatuh tempo atau saat lewat jatuh tempo.
+- scope: scheduler event `billing.due_soon`, `billing.overdue`, `installment.due_soon`, `installment.overdue`, enqueue pengiriman notifikasi.
+- dependencies: `event-driven-personal-notification-triggers`
+- acceptance criteria: event domain `billing.due_soon`, `billing.overdue`, `installment.due_soon`, `installment.overdue` aktif; reminder dapat dijadwalkan melalui `scheduled_at`; reminder dikirim lewat email/WhatsApp.
+- out of scope: kalender hari libur, aturan reminder multi-step.
+
+20. `audit-log-transactions`
+- goal: menyediakan jejak audit untuk transaksi dan aksi penting.
+- scope: audit log pada billing, installment, payment, notification send, perubahan master kritikal.
+- dependencies: `billing-record-management`, `installment-plan-management`, `payment-entry-and-settlement`, `personal-notification-center`
+- acceptance criteria: audit log transaksi aktif; security requirement untuk audit log terpenuhi; perubahan/transaksi dapat ditelusuri.
+- out of scope: integrasi SIEM, immutable external archive.
+
+21. `report-export`
+- goal: memungkinkan data laporan dikeluarkan dari sistem untuk kebutuhan operasional.
+- scope: export dari laporan finance/superadmin, basic reports page support.
+- dependencies: `finance-operations-dashboard`, `superadmin-global-dashboard`
+- acceptance criteria: capability `Report Export` tersedia; finance dapat melihat laporan keuangan; superadmin dapat melihat laporan global.
+- out of scope: scheduled email report, designer laporan kustom.
+
+22. `notification-resilience-hardening`
+- goal: memperkuat keandalan pipeline notifikasi saat volume dan kegagalan meningkat.
+- scope: retry mechanism, idempotent event processing, failure tracking.
+- dependencies: `personal-notification-center`, `event-driven-personal-notification-triggers`
+- acceptance criteria: retry mechanism untuk notifikasi tersedia; event processing idempotent; kegagalan pengiriman tidak membuat duplikasi event.
+- out of scope: dead-letter dashboard, multi-provider failover.
+
+Kalau mau, saya bisa lanjut pecahkan daftar ini menjadi:
+1. file/folder OpenSpec per change, atau
+2. urutan implementasi sprint-by-sprint untuk tim backend/frontend.
