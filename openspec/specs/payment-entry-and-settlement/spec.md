@@ -45,7 +45,7 @@ The system SHALL support payments recorded against a billing directly or a speci
 The system MUST update billing statuses according to cumulative paid amount.
 
 #### Scenario: Partial settlement
-- **WHEN** cumulative payment amount is greater than zero and less than the billing total
+- **WHEN cumulative payment amount is greater than zero and less than the billing total
 - **THEN** the system stores the billing status as `PARTIALLY_PAID`
 
 #### Scenario: Full settlement
@@ -92,3 +92,14 @@ The system SHALL expose an endpoint allowing authenticated `PARENT` users to fet
 #### Scenario: Parent queries unlinked student payments
 - **WHEN** an authenticated `PARENT` requests payment histories for a `studentId` they are NOT linked to
 - **THEN** the system rejects the request as forbidden
+
+### Requirement: Payment Processing Outcomes (Triggering Notifications)
+The existing payment processing operation MUST fire a notification event. The core requirement is extended to mandate that successful persistence of a payment also results in notifying the parent.
+
+#### Scenario: Submitting a valid payment entry generates a parent notification
+- **WHEN** an authenticated user with `FINANCE` or `SUPERADMIN` role provides valid data for a new payment
+- **THEN** the system stores the payment record
+- **AND** updates the status of the related billing entity
+- **AND** calculates the new total payment amount compared against the billing amount limits
+- **AND** emits an event or directly calls a notification service hook to ensure the parent is alerted to this successful payment
+- **AND** returns a `PaymentResponseDto`.
