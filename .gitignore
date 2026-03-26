@@ -21,6 +21,7 @@ logs/
 
 /backend
 /frontend
+/free-react-tailwind-admin-dashboard
 
 .opencode/*
 .vscode/*
