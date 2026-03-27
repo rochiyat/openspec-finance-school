@@ -63,6 +63,7 @@ The app is now scaffolded. Use these commands unless local package scripts chang
 - `npm run test` - run backend unit tests.
 - `npx jest --config jest.config.ts --runInBand src/app.controller.spec.ts` - run one backend unit test file.
 - `npm run test:e2e` - run backend end-to-end tests.
+- `npm run generate:iqrolife-seed` - regenerate `sql/seed-iqrolife-users.sql` from embedded Iqrolife snapshot.
 
 ### Workspace
 - There is no root workspace runner.
