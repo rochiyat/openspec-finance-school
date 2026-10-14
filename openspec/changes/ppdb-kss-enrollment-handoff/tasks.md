@@ -40,9 +40,9 @@
 
 ## 7. PPDB frontend (iqrolife)
 
-- [ ] 7.1 Proxy route for the retry endpoint, forwarding backend 4xx errors
-- [ ] 7.2 Show handoff status badge, last error and "Kirim ke KSS / Kirim ulang" action in the formulir review list
-- [ ] 7.3 Show the handoff outcome after accepting a formulir
+- [x] 7.1 Proxy route for the retry endpoint, forwarding backend 4xx errors
+- [x] 7.2 Show handoff status badge, last error and "Kirim ke KSS / Kirim ulang" action in the formulir review list
+- [x] 7.3 Show the handoff outcome after accepting a formulir
 
 ## 8. Deployment
 
