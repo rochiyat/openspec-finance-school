@@ -1,28 +1,28 @@
 ## 1. KSS data model
 
-- [ ] 1.1 Add `ppdb_enrollments` entity and migration (`source_id` unique, `status`, `user_id`, `parent_id`, `student_id`, `mapping_id`, `created_at`, `completed_at`)
-- [ ] 1.2 Add `ppdb_class_mappings` entity and migration (`academic_year_id`, normalized `ppdb_level`, `class_id`, unique year + level)
-- [ ] 1.3 Create `ppdb-integration` module that owns both repositories and exports only its services
+- [x] 1.1 Add `ppdb_enrollments` entity and migration (`source_id` unique, `status`, `user_id`, `parent_id`, `student_id`, `mapping_id`, `created_at`, `completed_at`)
+- [x] 1.2 Add `ppdb_class_mappings` entity and migration (`academic_year_id`, normalized `ppdb_level`, `class_id`, unique year + level)
+- [x] 1.3 Create `ppdb-integration` module that owns both repositories and exports only its services
 
 ## 2. KSS class mapping management
 
-- [ ] 2.1 Implement mapping service: list with year and class names, create, update, delete; normalize level; 409 on duplicate year + level; 422 when the class is in another year
-- [ ] 2.2 Add `/ppdb-class-mappings` controller guarded by `BearerAuthGuard` + `@Roles('SUPERADMIN')`
-- [ ] 2.3 Unit tests for mapping rules (uniqueness, cross-year class, level normalization, non-superadmin rejected)
+- [x] 2.1 Implement mapping service: list with year and class names, create, update, delete; normalize level; 409 on duplicate year + level; 422 when the class is in another year
+- [x] 2.2 Add `/ppdb-class-mappings` controller guarded by `BearerAuthGuard` + `@Roles('SUPERADMIN')`
+- [x] 2.3 Unit tests for mapping rules (uniqueness, cross-year class, level normalization, non-superadmin rejected)
 
 ## 3. KSS account setup link
 
-- [ ] 3.1 Add `AuthService.sendAccountSetupLink(userId)` reusing the reset-token table with a 72-hour TTL and setup wording, email plus WhatsApp when a phone exists
-- [ ] 3.2 Unit test: token TTL, both channels, no password in any message
+- [x] 3.1 Add `AuthService.sendAccountSetupLink(userId)` reusing the reset-token table with a 72-hour TTL and setup wording, email plus WhatsApp when a phone exists
+- [x] 3.2 Unit test: token TTL, both channels, no password in any message
 
 ## 4. KSS enrollment intake
 
-- [ ] 4.1 Add `PpdbIntegrationGuard` (constant-time `x-integration-key` check against `PPDB_INTEGRATION_API_KEY`, fail closed when unset, ignores bearer tokens)
-- [ ] 4.2 Add intake DTO with validation (sourceId, academicYearName, level, student fullName/gender, parent fullName/email/phone/address)
-- [ ] 4.3 Implement resumable intake service: enrollment row by `source_id`, resolve year and mapping before any write, find-or-create user (add `PARENT` role if missing, `sendNotification: false`, unusable password), parent, student, primary mapping, mark completed, then send setup link for new users
-- [ ] 4.4 Add `POST /integrations/ppdb/enrollments` controller returning student id, parent id, NIS, `parentReused`
-- [ ] 4.5 Unit tests: new family, sibling reuse, staff user gains PARENT role, completed source id returns existing ids, resume after partial progress, missing mapping / unknown year create nothing, guard rejects missing, wrong and unconfigured key
-- [ ] 4.6 e2e test for the intake endpoint against the test database
+- [x] 4.1 Add `PpdbIntegrationGuard` (constant-time `x-integration-key` check against `PPDB_INTEGRATION_API_KEY`, fail closed when unset, ignores bearer tokens)
+- [x] 4.2 Add intake DTO with validation (sourceId, academicYearName, level, student fullName/gender, parent fullName/email/phone/address)
+- [x] 4.3 Implement resumable intake service: enrollment row by `source_id`, resolve year and mapping before any write, find-or-create user (add `PARENT` role if missing, `sendNotification: false`, unusable password), parent, student, primary mapping, mark completed, then send setup link for new users
+- [x] 4.4 Add `POST /integrations/ppdb/enrollments` controller returning student id, parent id, NIS, `parentReused`
+- [x] 4.5 Unit tests: new family, sibling reuse, staff user gains PARENT role, completed source id returns existing ids, resume after partial progress, missing mapping / unknown year create nothing, guard rejects missing, wrong and unconfigured key
+- [ ] 4.6 e2e test for the intake endpoint against the test database (HTTP contract test without DB is in `test/ppdb-intake.e2e-spec.ts`; the DB-backed run still needs a Postgres test instance)
 
 ## 5. KSS frontend
 
