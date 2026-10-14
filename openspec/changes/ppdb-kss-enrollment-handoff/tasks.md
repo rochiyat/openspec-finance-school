@@ -26,8 +26,8 @@
 
 ## 5. KSS frontend
 
-- [ ] 5.1 Add superadmin "Pemetaan Kelas PPDB" page: list, create, edit, delete mappings per academic year
-- [ ] 5.2 Add the page to the superadmin navigation and component tests for the form validation
+- [x] 5.1 Add superadmin "Pemetaan Kelas PPDB" page: list, create, edit, delete mappings per academic year
+- [x] 5.2 Add the page to the superadmin navigation and component tests for the form validation
 
 ## 6. PPDB handoff (iqrolife-backend)
 
