@@ -8,9 +8,9 @@ Branch di tiap repo bertumpuk; merge dari atas ke bawah (atau set base PR ke bra
 
 | Repo | Urutan branch |
 |---|---|
-| `iqrolife-backend` | `fix/ppdb-access-control` → `fix/ppdb-password-setup` → `fix/ppdb-status-rules` → `feat/ppdb-server-pricing` → `feat/ppdb-kss-handoff` |
-| `iqrolife` | `fix/ppdb-access-control` → `fix/ppdb-password-setup` → `fix/ppdb-status-rules` → `feat/ppdb-server-pricing` → `feat/ppdb-kss-handoff` |
-| `iqrolife-notification-service` | `fix/ppdb-access-control` → `fix/ppdb-password-setup` |
+| `iqrolife-backend` | `fix/ppdb-access-control` → `fix/ppdb-password-setup` → `fix/ppdb-status-rules` → `feat/ppdb-server-pricing` → `feat/ppdb-kss-handoff` → `fix/users-activation-link` |
+| `iqrolife` | `fix/ppdb-access-control` → `fix/ppdb-password-setup` → `fix/ppdb-status-rules` → `feat/ppdb-server-pricing` → `feat/ppdb-kss-handoff` → `fix/users-activation-link` |
+| `iqrolife-notification-service` | `fix/ppdb-access-control` → `fix/ppdb-password-setup` → `fix/users-activation-link` |
 | `kss-backend` | `feat/ppdb-enrollment-intake` |
 | `kss-frontend` | `feat/ppdb-class-mappings` |
 | ERP (root) | `docker-compose.yml` dan `.env.production.example` (belum di-commit, ada perubahan lain di file yang sama); OpenSpec di `feat/ppdb-kss-enrollment-handoff-spec` |
@@ -60,7 +60,7 @@ docker exec -i iqrolife-db psql -v ON_ERROR_STOP=1 -U postgres -d db_iqrolife < 
 docker exec -i iqrolife-db psql -v ON_ERROR_STOP=1 -U postgres -d db_kss < kss-backend/sql/1800000000022-create-ppdb-integration-tables.sql
 ```
 
-Setelah notification service baru menyala, masukkan template email `account-setup`:
+Setelah notification service baru menyala, masukkan template email `account-setup` dan `account-activation`:
 
 ```bash
 docker exec iqrolife-notif npm run seed
@@ -83,6 +83,7 @@ docker exec iqrolife-notif npm run seed
 - [ ] `POST /api/emails/send` tanpa login → 401.
 - [ ] "Lupa password" mengirim email dari backend; respons tidak berisi token.
 - [ ] Admin membuat user dari registrasi `approved` → orang tua menerima email *Aktivasi Akun Dashboard Iqrolife* (tanpa password).
+- [ ] Superadmin menambah user di halaman **Users** → user menerima email *Aktivasi Akun Dashboard Iqrolife* berisi link buat password; akun non-superadmin mendapat 403 di `/api/users`.
 - [ ] Form pendaftaran menampilkan biaya dari Settings dan potongan kupon yang benar; kupon tidak valid menampilkan alasannya.
 - [ ] Menerima formulir yang sudah direview → pesan "…sudah dikirim ke KSS (NIS …)", siswa dan orang tua muncul di KSS, orang tua menerima link aktivasi KSS.
 - [ ] Level tanpa pemetaan → formulir tetap diterima, status KSS "Gagal dikirim ke KSS" dengan alasan `PPDB_CLASS_MAPPING_MISSING`; setelah dipetakan, **Kirim ulang ke KSS** berhasil.
