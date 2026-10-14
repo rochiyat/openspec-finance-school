@@ -31,12 +31,12 @@
 
 ## 6. PPDB handoff (iqrolife-backend)
 
-- [ ] 6.1 Add migration 004 (TS + SQL) for `ppdb_kss_handoffs` and the Sequelize model
-- [ ] 6.2 Add KSS client util (payload builder with gender mapping, 10-second timeout, no payload logging, fails with "KSS belum dikonfigurasi" when env is missing)
-- [ ] 6.3 Create the handoff row in the accept transaction and send after commit; include handoff outcome in the accept response
-- [ ] 6.4 Add `POST /api/formulir-pendaftaran/:id/kss-handoff` (PPDB staff only, 409 when already SENT, creates the row for formulir accepted before this change)
-- [ ] 6.5 Include handoff status, attempts and last error in formulir list and detail responses for staff
-- [ ] 6.6 Unit tests for payload building and gender mapping; smoke tests for accept success, KSS down, retry, already sent, parent forbidden
+- [x] 6.1 Add migration 004 (TS + SQL) for `ppdb_kss_handoffs` and the Sequelize model
+- [x] 6.2 Add KSS client util (payload builder with gender mapping, 10-second timeout, no payload logging, fails with "KSS belum dikonfigurasi" when env is missing)
+- [x] 6.3 Create the handoff row in the accept transaction and send after commit; include handoff outcome in the accept response
+- [x] 6.4 Add `POST /api/formulir-pendaftaran/:id/kss-handoff` (PPDB staff only, 409 when already SENT, creates the row for formulir accepted before this change)
+- [x] 6.5 Include handoff status, attempts and last error in formulir list and detail responses for staff
+- [x] 6.6 Unit tests for payload building and gender mapping; smoke tests for accept success, KSS down, retry, already sent, parent forbidden
 
 ## 7. PPDB frontend (iqrolife)
 
