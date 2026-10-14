@@ -46,5 +46,5 @@
 
 ## 8. Deployment
 
-- [ ] 8.1 Add `PPDB_INTEGRATION_API_KEY` to kss-backend and `KSS_API_URL` + `KSS_INTEGRATION_API_KEY` to iqrolife-backend in docker-compose and the env examples
-- [ ] 8.2 Document rollout order, class-mapping setup and backfill of earlier accepted applicants
+- [x] 8.1 Add `PPDB_INTEGRATION_API_KEY` to kss-backend and `KSS_API_URL` + `KSS_INTEGRATION_API_KEY` to iqrolife-backend in docker-compose and the env examples (env examples committed; `docker-compose.yml` and `.env.production.example` changes left uncommitted in the ERP working tree alongside other pending edits)
+- [x] 8.2 Document rollout order, class-mapping setup and backfill of earlier accepted applicants (`openspec/docs/ppdb-deploy-runbook.md`)
