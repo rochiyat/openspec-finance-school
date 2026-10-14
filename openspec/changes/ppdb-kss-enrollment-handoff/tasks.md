@@ -22,7 +22,7 @@
 - [x] 4.3 Implement resumable intake service: enrollment row by `source_id`, resolve year and mapping before any write, find-or-create user (add `PARENT` role if missing, `sendNotification: false`, unusable password), parent, student, primary mapping, mark completed, then send setup link for new users
 - [x] 4.4 Add `POST /integrations/ppdb/enrollments` controller returning student id, parent id, NIS, `parentReused`
 - [x] 4.5 Unit tests: new family, sibling reuse, staff user gains PARENT role, completed source id returns existing ids, resume after partial progress, missing mapping / unknown year create nothing, guard rejects missing, wrong and unconfigured key
-- [ ] 4.6 e2e test for the intake endpoint against the test database (HTTP contract test without DB is in `test/ppdb-intake.e2e-spec.ts`; the DB-backed run still needs a Postgres test instance)
+- [x] 4.6 e2e test for the intake endpoint against the test database (`test/ppdb-intake.db.e2e-spec.ts`, opt-in via `E2E_DATABASE_NAME`; HTTP contract test without DB in `test/ppdb-intake.e2e-spec.ts`)
 
 ## 5. KSS frontend
 
