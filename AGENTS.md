@@ -64,6 +64,8 @@ The app is now scaffolded. Use these commands unless local package scripts chang
 - `npx jest --config jest.config.ts --runInBand src/app.controller.spec.ts` - run one backend unit test file.
 - `npm run test:e2e` - run backend end-to-end tests.
 - `npm run generate:iqrolife-seed` - regenerate `sql/seed-iqrolife-users.sql` from embedded Iqrolife snapshot.
+- `npm run student-reports:export-source -- --class <id> --year <id> (--term <1-4> | --period term|semester|year [--number <n>]) --out <file.json> [--student <id,id>]` - (kss-backend) generate DRAFT reports of a term (3 months, internal for teachers), semester (for parents) or year for a class or listed students and export content plus observation texts for the agent; needs migrations applied.
+- `npm run student-reports:import-narratives -- --in <file.json>` - (kss-backend) import agent narratives into DRAFT reports only.
 
 ### Workspace
 - There is no root workspace runner.
