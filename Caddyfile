@@ -1,0 +1,81 @@
+# Global options
+{
+    email admin@iqrolife.id
+}
+
+# 1. Web Komunitas (Next.js)
+iqrolife.id, www.iqrolife.id {
+    encode zstd gzip
+    reverse_proxy iqrolife-web:3000
+}
+
+# 2. Blog Komunitas (Next.js + Sanity)
+blog.iqrolife.id, www.blog.iqrolife.id {
+    encode zstd gzip
+    reverse_proxy iqrolife-blog:3000
+}
+
+# 3. API Web Komunitas (Express.js)
+api.iqrolife.id {
+    encode zstd gzip
+    reverse_proxy iqrolife-backend:5000
+}
+
+# 4. Notification Service API (Express + Prisma)
+notif.iqrolife.id, notification-service.iqrolife.id {
+    encode zstd gzip
+    reverse_proxy iqrolife-notif:3000
+}
+
+# 5. ERP KSS (Frontend SPA + Backend API Same-Origin)
+kss.iqrolife.id {
+    encode zstd gzip
+
+    # Route backend endpoints to kss-backend
+    handle /api/* {
+        reverse_proxy kss-backend:3000
+    }
+
+    # Route API Documentation Swagger to kss-backend
+    handle /docs/* {
+        reverse_proxy kss-backend:3000
+    }
+
+    # Route WebSockets (Socket.io) to kss-backend
+    handle /socket.io/* {
+        reverse_proxy kss-backend:3000
+    }
+
+    # All other routes served by kss-frontend (React SPA)
+    handle {
+        reverse_proxy kss-frontend:80
+    }
+}
+
+# 6. Backward Compatibility: api-kss.iqrolife.id
+api-kss.iqrolife.id {
+    encode zstd gzip
+    reverse_proxy kss-backend:3000
+}
+
+# 7. Family Talents Discovery (compose terpisah di family-talents-discovery/, gabung network ERP)
+familytalents.iqrolife.id {
+    encode zstd gzip
+    request_body /api/tma {
+        max_size 12MB
+    }
+    reverse_proxy ftd-app:3000
+}
+
+# 8. Dozzle Real-Time Log Viewer (Protected by Basic Auth)
+logs.iqrolife.id {
+    encode zstd gzip
+
+    basicauth {
+        # Default user: admin | password: ChangeMeNow123!
+        # Generate your own secure hash with: docker run --rm caddy:2-alpine caddy hash-password --plaintext "your-password"
+        admin $2a$14$L3zI85gJ88gYnNl/tS42vO9nCqA8tZ08r65m/42gC4qK2G3PzK.vS
+    }
+
+    reverse_proxy dozzle:8080
+}
