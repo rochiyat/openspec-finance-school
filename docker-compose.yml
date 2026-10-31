@@ -1,75 +1,353 @@
 version: '3.8'
 
 services:
+  # -------------------------------------------------------------
+  # DATABASE & CACHE (Shared single engine for all services)
+  # -------------------------------------------------------------
   db:
     image: postgres:15-alpine
-    container_name: si-keuangan-db
+    container_name: iqrolife-db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: si_keuangan
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_secure_pass}
+      POSTGRES_DB: postgres
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./docker/init-dbs.sql:/docker-entrypoint-initdb.d/init-dbs.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d si_keuangan"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 350M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: always
 
   redis:
     image: redis:7-alpine
-    container_name: si-keuangan-redis
-    ports:
-      - "6379:6379"
+    container_name: iqrolife-redis
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 80M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
     restart: always
 
-  backend:
+  # -------------------------------------------------------------
+  # FILE STORAGE (S3-compatible, internal only; one bucket per app)
+  # -------------------------------------------------------------
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: iqrolife-minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set (min 8 chars)}
+    volumes:
+      - miniodata:/data
+    # API stays on the Docker network (http://minio:9000). Console only on the VPS loopback:
+    # open it through an SSH tunnel: ssh -L 9001:127.0.0.1:9001 <vps>, then http://localhost:9001
+    ports:
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: always
+
+  # Creates buckets ftd/kss/iqrolife and a per-app key limited to its own bucket, then exits.
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    container_name: iqrolife-minio-init
+    entrypoint: ["/bin/sh", "/minio-init.sh"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      FTD_S3_ACCESS_KEY: ${FTD_S3_ACCESS_KEY:-}
+      FTD_S3_SECRET_KEY: ${FTD_S3_SECRET_KEY:-}
+      KSS_S3_ACCESS_KEY: ${KSS_S3_ACCESS_KEY:-}
+      KSS_S3_SECRET_KEY: ${KSS_S3_SECRET_KEY:-}
+      IQROLIFE_S3_ACCESS_KEY: ${IQROLIFE_S3_ACCESS_KEY:-}
+      IQROLIFE_S3_SECRET_KEY: ${IQROLIFE_S3_SECRET_KEY:-}
+    volumes:
+      - ./docker/minio-init.sh:/minio-init.sh:ro
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+
+  # -------------------------------------------------------------
+  # ERP KSS (kss.iqrolife.id & kss.iqrolife.id/api)
+  # -------------------------------------------------------------
+  kss-backend:
     build:
-      context: ./backend
+      context: ./kss-backend
       dockerfile: Dockerfile
-    container_name: si-keuangan-backend
+    container_name: kss-backend
     environment:
       - PORT=3000
       - NODE_ENV=production
       - DATABASE_HOST=db
       - DATABASE_PORT=5432
-      - DATABASE_USER=postgres
-      - DATABASE_PASSWORD=postgres
-      - DATABASE_NAME=si_keuangan
+      - DATABASE_USER=${POSTGRES_USER:-postgres}
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD:-postgres_secure_pass}
+      - DATABASE_NAME=db_kss
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CACHE_ENABLED=true
-      - JWT_SECRET=super-secret-key-for-enterprise-mode
-      - FRONTEND_URL=http://localhost:8080
-    ports:
-      - "3000:3000"
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set (min 32 chars)}
+      - TRUST_PROXY=1
+      - FRONTEND_URL=https://kss.iqrolife.id
+      - CORS_ORIGINS=https://kss.iqrolife.id
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME:-}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY:-}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET:-}
+      # Shared with iqrolife-backend (KSS_INTEGRATION_API_KEY); empty disables PPDB intake
+      - PPDB_INTEGRATION_API_KEY=${PPDB_INTEGRATION_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Healthy only when the API can reach its database (GET /api/health/ready).
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health/ready').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 500M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: always
 
-  frontend:
+  kss-frontend:
     build:
-      context: ./frontend
+      context: ./kss-frontend
       dockerfile: Dockerfile
-    container_name: si-keuangan-frontend
-    ports:
-      - "8080:80"
-    environment:
-      - VITE_API_BASE_URL=http://localhost:3000
+      args:
+        - VITE_API_BASE_URL=
+    container_name: kss-frontend
     depends_on:
-      - backend
+      - kss-backend
+    deploy:
+      resources:
+        limits:
+          memory: 50M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+    restart: always
+
+  # -------------------------------------------------------------
+  # WEB KOMUNITAS IQROLIFE (iqrolife.id & api.iqrolife.id)
+  # -------------------------------------------------------------
+  iqrolife-web:
+    build:
+      context: ./iqrolife
+      dockerfile: Dockerfile
+    container_name: iqrolife-web
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=https://api.iqrolife.id
+      - BACKEND_API_URL=http://iqrolife-backend:5000
+      - EMAIL_SERVICE_API_KEY=${NOTIFICATION_API_KEY:?NOTIFICATION_API_KEY is required}
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: always
+
+  iqrolife-blog:
+    build:
+      context: ./blog-iqrolife
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_SANITY_PROJECT_ID=oi1l4ox1
+        - NEXT_PUBLIC_SANITY_DATASET=production
+        - NEXT_PUBLIC_SITE_URL=https://blog.iqrolife.id
+    container_name: iqrolife-blog
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - NEXT_PUBLIC_SITE_URL=https://blog.iqrolife.id
+      - NEXT_PUBLIC_SANITY_PROJECT_ID=oi1l4ox1
+      - NEXT_PUBLIC_SANITY_DATASET=production
+      - NEXT_PUBLIC_SANITY_API_VERSION=2026-07-01
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: always
+
+  iqrolife-backend:
+    build:
+      context: ./iqrolife-backend
+      dockerfile: Dockerfile
+    container_name: iqrolife-backend
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      - STANDALONE=true
+      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_secure_pass}@db:5432/db_iqrolife
+      - DATABASE_SSL=false
+      - CORS_ORIGIN=https://iqrolife.id,https://www.iqrolife.id
+      - JWT_SECRET=${IQROLIFE_JWT_SECRET:-iqrolife_jwt_secret_key}
+      - NOTIFICATION_SERVICE_URL=http://iqrolife-notif:3000
+      - NOTIFICATION_API_KEY=${NOTIFICATION_API_KEY:?NOTIFICATION_API_KEY is required}
+      - APP_URL=https://iqrolife.id
+      # PPDB -> KSS enrollment handoff; empty key makes handoffs fail with a clear reason
+      - KSS_API_URL=http://kss-backend:3000/api
+      - KSS_INTEGRATION_API_KEY=${PPDB_INTEGRATION_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 180M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: always
+
+  # -------------------------------------------------------------
+  # NOTIFICATION SERVICE (notif.iqrolife.id)
+  # -------------------------------------------------------------
+  iqrolife-notif:
+    build:
+      context: ./iqrolife-notification-service
+      dockerfile: Dockerfile
+    container_name: iqrolife-notif
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_secure_pass}@db:5432/db_iqrolife
+      - CORS_ORIGIN=https://iqrolife.id,https://api.iqrolife.id,https://kss.iqrolife.id
+      - NOTIFICATION_API_KEY=${NOTIFICATION_API_KEY:?NOTIFICATION_API_KEY is required}
+      # Sender address and Gmail SMTP auth; without GMAIL_USER every email insert fails (from is required)
+      - GMAIL_USER=${GMAIL_USER:?GMAIL_USER is required}
+      - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD:?GMAIL_APP_PASSWORD is required}
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: always
+
+  # -------------------------------------------------------------
+  # LOG VIEWER (logs.iqrolife.id)
+  # -------------------------------------------------------------
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      resources:
+        limits:
+          memory: 30M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+    restart: always
+
+  # -------------------------------------------------------------
+  # REVERSE PROXY & AUTOMATIC SSL (Caddy)
+  # -------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - kss-backend
+      - kss-frontend
+      - iqrolife-web
+      - iqrolife-blog
+      - iqrolife-backend
+      - iqrolife-notif
+      - dozzle
+    deploy:
+      resources:
+        limits:
+          memory: 60M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: always
 
 volumes:
   pgdata:
+  redisdata:
+  miniodata:
+  caddy_data:
+  caddy_config:
